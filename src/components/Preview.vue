@@ -82,7 +82,7 @@ const init = (template: Template, inputOverride?: Record<string, string>) => {
       schemasList.value = sl;
       await currentRefresh(dynamicTemplate);
     })
-    .catch((err) => console.error(`[@pdfme-vue] `, err));
+    .catch((err) => console.error(`[@pdfme-vue] Preview init error:`, err));
 };
 
 watch(
@@ -204,7 +204,7 @@ const onPaperRef = (index: number, el: HTMLDivElement) => {
       :unitNum="inputs.length"
       :setUnitCursor="(u: number) => { unitCursor = u; }"
     />
-    <div ref="containerRef" :style="{ ...size, position: 'relative', overflow: 'auto' }">
+    <div ref="containerRef" :style="{ width: size.width + 'px', height: size.height + 'px', position: 'relative', overflow: 'auto' }">
       <Paper
         :scale="scale"
         :size="size"

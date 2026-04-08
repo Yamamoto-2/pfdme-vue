@@ -12,6 +12,7 @@ class Form extends PreviewUI {
 
   constructor(props: PreviewProps) {
     super(props);
+    this.render();
   }
 
   public onChangeInput(cb: (arg: { index: number; value: string; name: string }) => void) {

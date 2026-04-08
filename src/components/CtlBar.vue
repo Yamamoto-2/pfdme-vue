@@ -2,7 +2,7 @@
 import { inject, computed } from 'vue';
 import type { Size } from '@pdfme/common';
 import { Plus, Minus, ChevronLeft, ChevronRight, Ellipsis } from 'lucide-vue-next';
-import { Typography, Button, Dropdown } from 'ant-design-vue';
+import { Typography, Button, Dropdown, Menu, MenuItem } from 'ant-design-vue';
 import { I18nKey } from '../composables/injection-keys';
 import { useMaxZoom } from '../composables/useMaxZoom';
 import { UI_CLASSNAME } from '../constants';
@@ -119,15 +119,15 @@ const barWidth = computed(() => {
           <Ellipsis :size="16" :style="{ color: textStyle.color }" />
         </Button>
         <template #overlay>
-          <a-menu>
-            <a-menu-item
+          <Menu>
+            <MenuItem
               v-for="item in contextMenuItems"
               :key="item.key"
               @click="item.onClick"
             >
               {{ item.label }}
-            </a-menu-item>
-          </a-menu>
+            </MenuItem>
+          </Menu>
         </template>
       </Dropdown>
     </div>

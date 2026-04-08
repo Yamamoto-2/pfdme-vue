@@ -11,6 +11,7 @@ class Viewer extends PreviewUI {
 
   constructor(props: PreviewProps) {
     super(props);
+    this.render();
     console.warn(
       '[@pdfme-vue] Viewer component is deprecated and will be removed in a future version.',
     );

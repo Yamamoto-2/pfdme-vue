@@ -21,6 +21,7 @@ class Designer extends BaseUIClass {
   constructor(props: DesignerProps) {
     super(props);
     checkDesignerProps(props);
+    this.render();
   }
 
   public saveTemplate() {

@@ -1,0 +1,28 @@
+{
+  "name": "pdfme-vue-playground",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@pdfme/common": "^6.0.0",
+    "@pdfme/generator": "^6.0.0",
+    "@pdfme/schemas": "^6.0.0",
+    "@scena/guides": "^0.29.2",
+    "ant-design-vue": "^4.2.6",
+    "dompurify": "^3.3.3",
+    "hotkeys-js": "^4.0.3",
+    "lucide-vue-next": "^1.0.0",
+    "moveable": "^0.53.0",
+    "selecto": "^1.26.3",
+    "vue": "^3.5.13"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.2.3",
+    "typescript": "^5.7.3",
+    "vite": "^6.3.1"
+  }
+}

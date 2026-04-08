@@ -3,7 +3,10 @@
     "allow": [
       "Bash(npm view:*)",
       "Bash(npx vite:*)",
-      "Bash(npx vue-tsc:*)"
+      "Bash(npx vue-tsc:*)",
+      "Bash(node -e \" const { PropPanelWidgetProps } = require\\('@pdfme/common'\\); console.log\\(typeof PropPanelWidgetProps\\); \")",
+      "Bash(node -e ':*)",
+      "Bash(curl -s \"http://localhost:5181/@fs/C:/Project/pdfme-vue/src/class.ts\")"
     ]
   }
 }

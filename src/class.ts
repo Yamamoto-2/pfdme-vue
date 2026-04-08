@@ -2,7 +2,7 @@ import { Component, App, createApp, defineComponent, h, shallowRef, type Shallow
 import { DESTROYED_ERR_MSG, DEFAULT_LANG } from './constants';
 import { debounce } from './helper';
 import {
-  cloneDeep,
+  cloneDeep as _cloneDeep,
   Template,
   Size,
   Lang,
@@ -20,6 +20,16 @@ import {
   pluginRegistry,
 } from '@pdfme/common';
 import { builtInPlugins } from '@pdfme/schemas';
+
+// structuredClone (used by @pdfme/common's cloneDeep) fails on Vue reactive proxies.
+// Use JSON-based clone as a safe fallback for template data.
+const cloneDeep = <T>(obj: T): T => {
+  try {
+    return _cloneDeep(obj);
+  } catch {
+    return JSON.parse(JSON.stringify(obj)) as T;
+  }
+};
 
 export abstract class BaseUIClass {
   protected domContainer!: HTMLElement | null;
@@ -87,6 +97,7 @@ export abstract class BaseUIClass {
     if (Object.values(plugins).length > 0) {
       this.pluginsRegistry = pluginRegistry(plugins);
     }
+
   }
 
   protected getLang() {
