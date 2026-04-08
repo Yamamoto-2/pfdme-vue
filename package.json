@@ -1,0 +1,66 @@
+{
+  "name": "pdfme-vue",
+  "version": "0.1.0",
+  "description": "Vue 3 based PDF template Designer, Form, and Viewer. A Vue port of @pdfme/ui with full schema compatibility.",
+  "keywords": [
+    "pdf",
+    "pdf-designer",
+    "pdf-generation",
+    "pdf-viewer",
+    "vue",
+    "vue3",
+    "typescript"
+  ],
+  "license": "MIT",
+  "author": "Yamamoto",
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "dev": "vite build --watch",
+    "build": "vite build && vue-tsc -p tsconfig.build.json",
+    "clean": "rimraf dist",
+    "type-check": "vue-tsc --noEmit"
+  },
+  "dependencies": {
+    "@pdfme/converter": "^5.0.0",
+    "@scena/guides": "^0.29.0",
+    "ant-design-vue": "^4.2.6",
+    "dompurify": "^3.3.3",
+    "hotkeys-js": "^4.0.2",
+    "lucide-vue-next": "^0.577.0",
+    "moveable": "^0.53.0",
+    "selecto": "^1.26.0",
+    "vue": "^3.5.13",
+    "vuedraggable": "^4.1.0"
+  },
+  "devDependencies": {
+    "@pdfme/common": "^5.0.0",
+    "@pdfme/schemas": "^5.0.0",
+    "@types/dompurify": "^3.0.5",
+    "@vitejs/plugin-vue": "^5.2.3",
+    "csstype": "^3.1.3",
+    "rimraf": "^6.0.1",
+    "typescript": "^5.7.3",
+    "vite": "^6.3.1",
+    "vite-plugin-css-injected-by-js": "^3.5.2",
+    "vue-tsc": "^2.2.8"
+  },
+  "peerDependencies": {
+    "@pdfme/common": ">=5.0.0",
+    "@pdfme/schemas": ">=5.0.0"
+  }
+}

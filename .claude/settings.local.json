@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm view:*)",
+      "Bash(npx vite:*)",
+      "Bash(npx vue-tsc:*)"
+    ]
+  }
+}
