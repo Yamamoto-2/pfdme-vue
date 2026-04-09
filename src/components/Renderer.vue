@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, inject, watch, onBeforeUnmount, computed } from 'vue';
 import type { Mode, SchemaForUI, BasePdf, Schema, Plugin, UIOptions } from '@pdfme/common';
-import { ZOOM, cloneDeep } from '@pdfme/common';
+import { ZOOM, cloneDeep as _rawCloneDeep } from '@pdfme/common';
+const cloneDeep = <T>(o: T): T => { try { return _rawCloneDeep(o); } catch { return JSON.parse(JSON.stringify(o)); } };
 import { SELECTABLE_CLASSNAME } from '../constants';
 import { PluginsRegistryKey, OptionsKey, I18nKey, CacheKey } from '../composables/injection-keys';
 
@@ -11,13 +12,14 @@ const props = defineProps<{
   value: string;
   outline: string;
   onChangeHoveringSchemaId?: (id: string | null) => void;
+  onClickSchema?: (id: string, event: MouseEvent) => void;
   scale: number;
   mode: Mode;
   onChange?: (arg: { key: string; value: unknown } | { key: string; value: unknown }[]) => void;
   stopEditing?: () => void;
   tabIndex?: number;
   placeholder?: string;
-  selectable?: boolean;
+  noSelect?: boolean;
 }>();
 
 const pluginsRegistry = inject(PluginsRegistryKey)!;
@@ -111,7 +113,7 @@ onBeforeUnmount(() => {
   <div
     v-if="plugin"
     :title="schema.name"
-    :class="(selectable !== false) ? SELECTABLE_CLASSNAME : ''"
+    :class="noSelect ? '' : 'selectable'"
     :id="schema.id"
     :style="{
       position: 'absolute',
@@ -126,6 +128,7 @@ onBeforeUnmount(() => {
     }"
     @mouseenter="onChangeHoveringSchemaId?.(schema.id)"
     @mouseleave="onChangeHoveringSchemaId?.(null)"
+    @mousedown="(e: MouseEvent) => { if (onClickSchema) { onClickSchema(schema.id, e); } }"
   >
     <span
       v-if="schema.required"

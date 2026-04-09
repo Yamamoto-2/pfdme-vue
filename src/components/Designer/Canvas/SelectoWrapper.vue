@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onBeforeUnmount, watch } from 'vue';
+import { onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
 import SelectoLib from 'selecto';
 import { SELECTABLE_CLASSNAME } from '../../../constants';
 
@@ -10,17 +10,18 @@ const props = defineProps<{
   onSelect: (e: any) => void;
 }>();
 
-const className = 'pdfme-selecto';
 let selecto: SelectoLib | null = null;
 
-const createSelecto = () => {
+const createSelecto = async () => {
   if (selecto) {
     selecto.destroy();
+    selecto = null;
   }
   if (!props.container) return;
 
+  await nextTick();
+
   selecto = new SelectoLib({
-    className,
     container: props.container,
     selectFromInside: false,
     selectByClick: true,
@@ -28,28 +29,17 @@ const createSelecto = () => {
     hitRate: 0,
     selectableTargets: [`.${SELECTABLE_CLASSNAME}`],
     continueSelect: props.continueSelect,
+    toggleContinueSelect: 'shift',
   });
 
   selecto.on('dragStart', (e: any) => props.onDragStart(e));
   selecto.on('select', (e: any) => props.onSelect(e));
-
-  // Style the selecto element
-  const containerElement = document.querySelector('.' + className);
-  if (containerElement instanceof HTMLElement) {
-    containerElement.style.backgroundColor = 'var(--ant-color-primary, #38a0ff)';
-    containerElement.style.opacity = '0.75';
-    containerElement.style.borderColor = 'var(--ant-color-primary-border, #38a0ff)';
-  }
 };
 
 onMounted(createSelecto);
-
 watch(() => props.container, createSelecto);
-
 watch(() => props.continueSelect, (val) => {
-  if (selecto) {
-    selecto.continueSelect = val;
-  }
+  if (selecto) selecto.continueSelect = val;
 });
 
 onBeforeUnmount(() => {
@@ -58,6 +48,4 @@ onBeforeUnmount(() => {
 });
 </script>
 
-<template>
-  <div />
-</template>
+<template><span style="display:none" /></template>

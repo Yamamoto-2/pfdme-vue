@@ -41,6 +41,7 @@
     "ant-design-vue": "^4.2.6",
     "dompurify": "^3.3.3",
     "hotkeys-js": "^4.0.2",
+    "konva": "^10.2.3",
     "lucide-vue-next": "^0.577.0",
     "moveable": "^0.53.0",
     "selecto": "^1.26.0",

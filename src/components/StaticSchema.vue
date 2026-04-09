@@ -44,7 +44,7 @@ const getValue = (schema: { name: string; readOnly?: boolean; content?: string }
     mode="viewer"
     outline="none"
     :scale="scale"
-    :selectable="false"
+    :noSelect="true"
     :onChangeHoveringSchemaId="() => {}"
   />
 </template>
