@@ -1,5 +1,5 @@
 import {
-  cloneDeep,
+  cloneDeep as _rawCloneDeep,
   Template,
   DesignerProps,
   checkDesignerProps,
@@ -11,6 +11,8 @@ import { DESTROYED_ERR_MSG } from './constants';
 import AppContextProvider from './components/AppContextProvider.vue';
 import DesignerComponent from './components/Designer/DesignerComponent.vue';
 import { h } from 'vue';
+
+const cloneDeep = <T>(o: T): T => { try { return _rawCloneDeep(o); } catch { return JSON.parse(JSON.stringify(o)); } };
 
 class Designer extends BaseUIClass {
   private onSaveTemplateCallback?: (template: Template) => void;

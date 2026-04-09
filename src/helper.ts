@@ -1,6 +1,6 @@
 import hotkeysJs from 'hotkeys-js';
 import {
-  cloneDeep,
+  cloneDeep as _cloneDeep,
   ZOOM,
   getB64BasePdf,
   b64toUint8Array,
@@ -13,6 +13,15 @@ import {
 } from '@pdfme/common';
 import { pdf2size } from '@pdfme/converter';
 import { DEFAULT_MAX_ZOOM, RULER_HEIGHT } from './constants';
+
+// structuredClone (used by @pdfme/common's cloneDeep) fails on Vue reactive proxies.
+const cloneDeep = <T>(obj: T): T => {
+  try {
+    return _cloneDeep(obj);
+  } catch {
+    return JSON.parse(JSON.stringify(obj)) as T;
+  }
+};
 
 // Define a type for the hotkeys function with additional properties
 type HotkeysFunction = {

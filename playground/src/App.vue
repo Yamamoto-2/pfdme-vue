@@ -5,6 +5,7 @@ import { text, image, barcodes, line, rectangle, ellipse } from '@pdfme/schemas'
 import { generate } from '@pdfme/generator';
 import { Designer, Form, Viewer } from 'pdfme-vue';
 import { blankTemplate, invoiceTemplate, certificateTemplate } from './templates';
+import customTemplateJson from '../../template.json';
 
 const mode = ref<'designer' | 'form' | 'viewer'>('designer');
 const currentTemplateName = ref('blank');
@@ -21,10 +22,12 @@ let viewerInstance: Viewer | null = null;
 
 const containerRef = ref<HTMLDivElement>();
 
+// Only include commonly used barcode types to keep sidebar clean
 const plugins = {
   Text: text,
   Image: image,
-  ...barcodes,
+  QR: barcodes.qrcode,
+  Code128: barcodes.code128,
   Line: line,
   Rectangle: rectangle,
   Ellipse: ellipse,
@@ -90,6 +93,7 @@ const selectTemplate = (name: string) => {
     case 'blank': currentTemplate.value = blankTemplate; break;
     case 'invoice': currentTemplate.value = invoiceTemplate; break;
     case 'certificate': currentTemplate.value = certificateTemplate; break;
+    case 'custom': currentTemplate.value = customTemplateJson as Template; break;
   }
   mountComponent();
 };
@@ -121,7 +125,11 @@ const doImport = () => {
 const generatePdf = async () => {
   try {
     const t = designerInstance?.getTemplate() ?? getRawTemplate();
-    const inputs = formInstance?.getInputs() ?? [{}];
+    const inputs = formInstance?.getInputs() ?? [
+      Object.fromEntries(
+        t.schemas.flat().filter((s: any) => !s.readOnly).map((s: any) => [s.name, s.content || ''])
+      ),
+    ];
     const pdf = await generate({ template: t, inputs, plugins });
     const blob = new Blob([pdf.buffer], { type: 'application/pdf' });
     const url = URL.createObjectURL(blob);
@@ -186,6 +194,7 @@ onBeforeUnmount(destroyAll);
         <option value="blank">Blank Template</option>
         <option value="invoice">Invoice Template</option>
         <option value="certificate">Certificate Template</option>
+        <option value="custom">Custom (template.json)</option>
       </select>
 
       <div :style="{ width: '1px', height: '24px', background: '#555', margin: '0 8px' }" />

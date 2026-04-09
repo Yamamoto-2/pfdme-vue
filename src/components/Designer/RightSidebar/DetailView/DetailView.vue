@@ -38,17 +38,6 @@ const typedI18n = (key: string): string => {
 // Local form state that tracks the active schema
 const formValues = ref<Record<string, unknown>>({});
 
-// Sync form values when active schema changes
-watch(
-  () => props.activeSchema,
-  (schema) => {
-    const values: Record<string, unknown> = { ...schema };
-    values.editable = !schema.readOnly;
-    formValues.value = values;
-  },
-  { immediate: true, deep: true },
-);
-
 // Handle field changes with debounced commit
 const handleFieldChange = debounce(function (...args: unknown[]) {
   const key = args[0] as string;
@@ -113,6 +102,17 @@ const defaultSchema = computed<Record<string, unknown>>(() => {
   return result;
 });
 
+// Sync form values when active schema changes, merging plugin defaults
+watch(
+  [() => props.activeSchema, defaultSchema],
+  ([schema, defaults]) => {
+    const values: Record<string, unknown> = { ...defaults, ...schema };
+    values.editable = !schema.readOnly;
+    formValues.value = values;
+  },
+  { immediate: true, deep: true },
+);
+
 // Calculate padding
 const padding = computed(() => isBlankPdf(props.basePdf) ? props.basePdf.padding : [0, 0, 0, 0]);
 const [pt, pr, pb, pl] = [
@@ -161,6 +161,27 @@ const widgetProps = computed<WidgetProps>(() => ({
 const getFieldWidget = (key: string, fieldDef: any) => {
   if (!fieldDef) return null;
   return { key, ...fieldDef };
+};
+
+// Color field pairing helpers: put consecutive color fields on the same row
+const isPrevFieldColor = (currentKey: string | number) => {
+  const keys = Object.keys(pluginSchemaProps.value);
+  const idx = keys.indexOf(String(currentKey));
+  if (idx <= 0) return false;
+  const prevDef = pluginSchemaProps.value[keys[idx - 1]];
+  return prevDef?.type === 'string' && prevDef?.widget === 'color';
+};
+
+const getNextFieldColor = (currentKey: string | number): { key: string; def: any } | null => {
+  const keys = Object.keys(pluginSchemaProps.value);
+  const idx = keys.indexOf(String(currentKey));
+  if (idx < 0 || idx >= keys.length - 1) return null;
+  const nextKey = keys[idx + 1];
+  const nextDef = pluginSchemaProps.value[nextKey];
+  if (nextDef?.type === 'string' && nextDef?.widget === 'color') {
+    return { key: nextKey, def: nextDef };
+  }
+  return null;
 };
 
 const isHidden = (fieldDef: any) => {
@@ -245,6 +266,20 @@ const isHidden = (fieldDef: any) => {
                 :value="formValues.name as string"
                 autoComplete="off"
                 @change="(e: any) => updateField('name', e.target.value)"
+              />
+            </Form.Item>
+          </Col>
+        </Row>
+
+        <!-- Content -->
+        <Row v-if="!activeSchema.readOnly" :gutter="8">
+          <Col :span="24">
+            <Form.Item label="Content">
+              <Input.TextArea
+                :value="formValues.content as string"
+                :rows="3"
+                :style="{ fontFamily: 'monospace', fontSize: '12px' }"
+                @change="(e: any) => updateField('content', e.target.value)"
               />
             </Form.Item>
           </Col>
@@ -358,40 +393,94 @@ const isHidden = (fieldDef: any) => {
 
           <template v-for="(fieldDef, fieldKey) in pluginSchemaProps" :key="fieldKey">
             <template v-if="!isHidden(fieldDef)">
-              <!-- Void type: custom widgets -->
-              <template v-if="fieldDef.type === 'void'">
+
+              <!-- Custom plugin widget (e.g. UseDynamicFontSize) -->
+              <template v-if="fieldDef.widget && typeof fieldDef.widget === 'string' && !['select','inputNumber','color','card','input','Divider','ButtonGroup'].includes(fieldDef.widget) && pluginWidgets[fieldDef.widget]">
+                <Form.Item :label="fieldDef.title || undefined">
+                  <WidgetRenderer
+                    v-bind="{ ...widgetProps, schema: fieldDef }"
+                    :widget="pluginWidgets[fieldDef.widget]"
+                  />
+                </Form.Item>
+              </template>
+
+              <!-- Void type: built-in widgets -->
+              <template v-else-if="fieldDef.type === 'void'">
                 <template v-if="fieldDef.widget === 'Divider'">
                   <Divider :style="{ margin: '4px 0' }" />
                 </template>
                 <template v-else-if="fieldDef.widget === 'ButtonGroup'">
                   <ButtonGroupWidget v-bind="{ ...widgetProps, schema: fieldDef }" />
                 </template>
-                <template v-else-if="pluginWidgets[fieldDef.widget]">
-                  <WidgetRenderer
-                    v-bind="{ ...widgetProps, schema: fieldDef }"
-                    :widget="pluginWidgets[fieldDef.widget]"
-                  />
+              </template>
+
+              <!-- Color fields: group consecutive colors into one row -->
+              <template v-else-if="fieldDef.type === 'string' && fieldDef.widget === 'color'">
+                <!-- Skip if previous sibling was also color (already rendered as pair) -->
+                <template v-if="!isPrevFieldColor(fieldKey)">
+                  <Row :gutter="8">
+                    <Col :span="getNextFieldColor(fieldKey) ? 12 : 24">
+                      <Form.Item :label="fieldDef.title || String(fieldKey)">
+                        <div :style="{ display: 'flex', alignItems: 'center', gap: '4px' }">
+                          <div :style="{
+                            position: 'relative', width: '28px', height: '24px', flexShrink: 0,
+                            border: '1px solid #d9d9d9', borderRadius: '2px', overflow: 'hidden',
+                            background: (formValues as any)[fieldKey] || '#fff',
+                          }">
+                            <input type="color"
+                              :value="(formValues as any)[fieldKey] || '#ffffff'"
+                              @input="(e: any) => updateField(String(fieldKey), e.target.value)"
+                              :style="{ opacity: 0, position: 'absolute', inset: 0, width: '100%', height: '100%', cursor: 'pointer', border: 'none' }"
+                            />
+                          </div>
+                          <Input
+                            :value="(formValues as any)[fieldKey] || ''"
+                            placeholder=""
+                            :style="{ flex: 1 }"
+                            @change="(e: any) => updateField(String(fieldKey), e.target.value || '')"
+                          />
+                        </div>
+                      </Form.Item>
+                    </Col>
+                    <!-- Pair: next color field on same row -->
+                    <Col v-if="getNextFieldColor(fieldKey)" :span="12">
+                      <Form.Item :label="getNextFieldColor(fieldKey)!.def.title || getNextFieldColor(fieldKey)!.key">
+                        <div :style="{ display: 'flex', alignItems: 'center', gap: '4px' }">
+                          <div :style="{
+                            position: 'relative', width: '28px', height: '24px', flexShrink: 0,
+                            border: '1px solid #d9d9d9', borderRadius: '2px', overflow: 'hidden',
+                            background: (formValues as any)[getNextFieldColor(fieldKey)!.key] || '#fff',
+                          }">
+                            <input type="color"
+                              :value="(formValues as any)[getNextFieldColor(fieldKey)!.key] || '#ffffff'"
+                              @input="(e: any) => updateField(getNextFieldColor(fieldKey)!.key, e.target.value)"
+                              :style="{ opacity: 0, position: 'absolute', inset: 0, width: '100%', height: '100%', cursor: 'pointer', border: 'none' }"
+                            />
+                          </div>
+                          <Input
+                            :value="(formValues as any)[getNextFieldColor(fieldKey)!.key] || ''"
+                            placeholder=""
+                            :style="{ flex: 1 }"
+                            @change="(e: any) => updateField(getNextFieldColor(fieldKey)!.key, e.target.value || '')"
+                          />
+                        </div>
+                      </Form.Item>
+                    </Col>
+                  </Row>
                 </template>
               </template>
 
-              <!-- String field -->
+              <!-- String field (non-color) -->
               <template v-else-if="fieldDef.type === 'string'">
                 <Row :gutter="8">
                   <Col :span="fieldDef.span || 24">
-                    <Form.Item :label="fieldDef.title">
+                    <Form.Item :label="fieldDef.title || String(fieldKey)">
                       <Select
                         v-if="fieldDef.widget === 'select'"
                         :value="(formValues as any)[fieldKey]"
-                        :options="fieldDef.props?.options || []"
+                        :options="(fieldDef.props?.options || []).map((o: any) => typeof o === 'string' ? { label: o, value: o } : { ...o, label: o.label || o.value })"
                         :style="{ width: '100%' }"
                         @change="(val: any) => updateField(String(fieldKey), val)"
-                      />
-                      <Input
-                        v-else-if="fieldDef.widget === 'color'"
-                        type="color"
-                        :value="(formValues as any)[fieldKey]"
-                        :style="{ width: '100%' }"
-                        @change="(e: any) => updateField(String(fieldKey), e.target.value)"
                       />
                       <Input
                         v-else
@@ -407,7 +496,7 @@ const isHidden = (fieldDef: any) => {
               <template v-else-if="fieldDef.type === 'number'">
                 <Row :gutter="8">
                   <Col :span="fieldDef.span || 24">
-                    <Form.Item :label="fieldDef.title">
+                    <Form.Item :label="fieldDef.title || String(fieldKey)">
                       <InputNumber
                         :value="(formValues as any)[fieldKey]"
                         :min="fieldDef.min ?? fieldDef.props?.min"
@@ -422,11 +511,11 @@ const isHidden = (fieldDef: any) => {
                 </Row>
               </template>
 
-              <!-- Boolean field -->
+              <!-- Boolean field (plain, no custom widget) -->
               <template v-else-if="fieldDef.type === 'boolean'">
                 <Row :gutter="8">
                   <Col :span="fieldDef.span || 24">
-                    <Form.Item :label="fieldDef.title">
+                    <Form.Item :label="fieldDef.title || String(fieldKey)">
                       <Switch
                         :checked="(formValues as any)[fieldKey]"
                         @change="(val: any) => updateField(String(fieldKey), val)"
@@ -442,8 +531,8 @@ const isHidden = (fieldDef: any) => {
                   <Text v-if="fieldDef.title" :style="{ fontSize: '12px', fontWeight: 600 }">{{ fieldDef.title }}</Text>
                   <Row :gutter="8">
                     <template v-for="(subDef, subKey) in fieldDef.properties" :key="subKey">
-                      <Col :span="subDef.span || 12">
-                        <Form.Item :label="subDef.title">
+                      <Col v-if="!isHidden(subDef)" :span="subDef.span || 12">
+                        <Form.Item :label="subDef.title || String(subKey)">
                           <InputNumber
                             v-if="subDef.type === 'number'"
                             :value="((formValues as any)[fieldKey] as any)?.[subKey]"
@@ -456,17 +545,29 @@ const isHidden = (fieldDef: any) => {
                           <Select
                             v-else-if="subDef.widget === 'select'"
                             :value="((formValues as any)[fieldKey] as any)?.[subKey]"
-                            :options="subDef.props?.options || []"
+                            :options="(subDef.props?.options || []).map((o: any) => typeof o === 'string' ? { label: o, value: o } : { ...o, label: o.label || o.value })"
                             :style="{ width: '100%' }"
                             @change="(val: any) => updateField(`${String(fieldKey)}.${String(subKey)}`, val)"
                           />
-                          <Input
-                            v-else-if="subDef.widget === 'color'"
-                            type="color"
-                            :value="((formValues as any)[fieldKey] as any)?.[subKey]"
-                            :style="{ width: '100%' }"
-                            @change="(e: any) => updateField(`${String(fieldKey)}.${String(subKey)}`, e.target.value)"
-                          />
+                          <div v-else-if="subDef.widget === 'color'" :style="{ display: 'flex', alignItems: 'center', gap: '4px' }">
+                            <div :style="{
+                              position: 'relative', width: '32px', height: '24px', flexShrink: 0,
+                              border: '1px solid #d9d9d9', borderRadius: '4px', overflow: 'hidden',
+                              background: ((formValues as any)[fieldKey] as any)?.[subKey] || '#fff',
+                            }">
+                              <input type="color"
+                                :value="((formValues as any)[fieldKey] as any)?.[subKey] || '#ffffff'"
+                                @input="(e: any) => updateField(`${String(fieldKey)}.${String(subKey)}`, e.target.value)"
+                                :style="{ opacity: 0, position: 'absolute', inset: 0, width: '100%', height: '100%', cursor: 'pointer', border: 'none' }"
+                              />
+                            </div>
+                            <Input
+                              :value="((formValues as any)[fieldKey] as any)?.[subKey] || ''"
+                              placeholder=""
+                              :style="{ flex: 1 }"
+                              @change="(e: any) => updateField(`${String(fieldKey)}.${String(subKey)}`, e.target.value || '')"
+                            />
+                          </div>
                           <Input
                             v-else
                             :value="((formValues as any)[fieldKey] as any)?.[subKey]"
