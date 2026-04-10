@@ -283,6 +283,7 @@ const onKonvaEditSchema = (id: string | null) => {
         :deselectSchema="() => { activeSchemaIds = []; }"
         :sidebarOpen="sidebarOpen"
         :setSidebarOpen="(o: boolean) => { sidebarOpen = o; }"
+        @deleteSchema="(id: string) => { removeSchemas([id]); }"
       />
 
       <!-- Canvas area: pdfme rendering + Konva overlay stacked -->
@@ -332,8 +333,7 @@ const onKonvaEditSchema = (id: string | null) => {
                 :schema="schema" :basePdf="template.basePdf"
                 :value="getSchemaValue(schema, idx)"
                 mode="viewer" :scale="scale"
-                :outline="editingSchemaId === schema.id ? 'none' : `1px dashed ${hoveringSchemaId === schema.id ? '#38a0ff' : (schema.readOnly ? 'transparent' : 'rgba(56,160,255,0.4)')}`"
-                :style="{ visibility: editingSchemaId === schema.id ? 'hidden' : 'visible' }"
+                :outline="`1px dashed ${hoveringSchemaId === schema.id ? '#38a0ff' : (schema.readOnly ? 'transparent' : 'rgba(56,160,255,0.4)')}`"
                 :noSelect="true"
               />
             </div>
@@ -355,6 +355,7 @@ const onKonvaEditSchema = (id: string | null) => {
             @changeSchemas="changeSchemas"
             @hoverSchema="(id: string | null) => { hoveringSchemaId = id; }"
             @editingSchema="onKonvaEditSchema"
+            @deleteSchemas="(ids: string[]) => removeSchemas(ids)"
           />
         </div>
       </div>

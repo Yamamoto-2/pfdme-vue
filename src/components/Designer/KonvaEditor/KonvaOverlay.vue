@@ -33,7 +33,8 @@ const emit = defineEmits<{
   (e: 'deselect'): void;
   (e: 'changeSchemas', changes: { key: string; value: unknown; schemaId: string }[]): void;
   (e: 'hoverSchema', id: string | null): void;
-  (e: 'editingSchema', id: string | null): void;  // tells parent to hide this schema in pdfme layer
+  (e: 'editingSchema', id: string | null): void;
+  (e: 'deleteSchemas', ids: string[]): void;
 }>();
 
 const containerRef = ref<HTMLDivElement>();
@@ -82,6 +83,19 @@ const initStage = () => {
   });
 
   buildNodes();
+
+  // Delete key handler
+  const onKeyDown = (e: KeyboardEvent) => {
+    if ((e.key === 'Delete' || e.key === 'Backspace') && props.activeSchemaIds.length > 0) {
+      // Don't delete if user is typing in an input
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      emit('deleteSchemas', props.activeSchemaIds);
+    }
+  };
+  window.addEventListener('keydown', onKeyDown);
+  const cleanup = () => window.removeEventListener('keydown', onKeyDown);
+  onBeforeUnmount(cleanup);
 };
 
 // --- Build schema overlay nodes ---
@@ -184,6 +198,10 @@ const buildNodes = () => {
         startEditing(schema);
       }
     });
+
+    // Hide delete button during drag/transform
+    group.on('dragstart transformstart', () => { if (deleteBtn) deleteBtn.hide(); });
+    group.on('dragend transformend', () => { if (deleteBtn) { deleteBtn.show(); updateTransformer(); } });
 
     // Drag constraints
     group.on('dragmove', () => {
@@ -303,12 +321,48 @@ const updateNodes = () => {
   layer.batchDraw();
 };
 
+let deleteBtn: Konva.Group | null = null;
+
 const updateTransformer = () => {
   if (!transformer || !layer) return;
   const selectedNodes = props.activeSchemaIds
     .map(id => layer!.findOne('#' + id))
     .filter(Boolean) as Konva.Node[];
   transformer.nodes(selectedNodes);
+
+  // Delete button — matches original pdfme: blue rounded rect with X icon
+  if (deleteBtn) { deleteBtn.destroy(); deleteBtn = null; }
+  if (selectedNodes.length > 0) {
+    let maxRight = -Infinity, minTop = Infinity;
+    selectedNodes.forEach(node => {
+      const rect = node.getClientRect({ relativeTo: layer ?? undefined });
+      if (rect.x + rect.width > maxRight) maxRight = rect.x + rect.width;
+      if (rect.y < minTop) minTop = rect.y;
+    });
+
+    const btnW = 26, btnH = 26, pad = 6;
+    deleteBtn = new Konva.Group({
+      x: maxRight + pad, y: minTop,
+      name: 'delete-btn', listening: true,
+    });
+    // Rounded rect background
+    deleteBtn.add(new Konva.Rect({
+      x: 0, y: 0, width: btnW, height: btnH,
+      fill: '#38a0ff', cornerRadius: 4, listening: true,
+    }));
+    // X lines (like lucide X icon)
+    deleteBtn.add(new Konva.Line({
+      points: [7, 7, 19, 19], stroke: '#fff', strokeWidth: 2, lineCap: 'round', listening: false,
+    }));
+    deleteBtn.add(new Konva.Line({
+      points: [19, 7, 7, 19], stroke: '#fff', strokeWidth: 2, lineCap: 'round', listening: false,
+    }));
+    deleteBtn.on('click tap', () => emit('deleteSchemas', props.activeSchemaIds));
+    deleteBtn.on('mouseenter', () => { if (containerRef.value) containerRef.value.style.cursor = 'pointer'; });
+    deleteBtn.on('mouseleave', () => { if (containerRef.value) containerRef.value.style.cursor = 'default'; });
+    layer.add(deleteBtn);
+  }
+
   layer.batchDraw();
 };
 

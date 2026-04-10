@@ -5,7 +5,7 @@ import { text, image, barcodes, line, rectangle, ellipse } from '@pdfme/schemas'
 import { generate } from '@pdfme/generator';
 import { Designer, Form, Viewer } from 'pdfme-vue';
 import { blankTemplate, invoiceTemplate, certificateTemplate } from './templates';
-import customTemplateJson from '../../template.json';
+import customTemplateJson from './templates/custom.json';
 
 const mode = ref<'designer' | 'form' | 'viewer'>('designer');
 const currentTemplateName = ref('blank');

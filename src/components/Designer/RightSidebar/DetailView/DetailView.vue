@@ -4,6 +4,10 @@ import type { Dict, SchemaForUI, Size, ChangeSchemas, BasePdf } from '@pdfme/com
 import type { WidgetProps } from '../../../../widget-types';
 import { isBlankPdf } from '@pdfme/common';
 import { Form, Input, InputNumber, Select, Switch, Divider, Typography, Button, Row, Col } from 'ant-design-vue';
+
+const emit = defineEmits<{
+  (e: 'deleteSchema', id: string): void;
+}>();
 import { Menu } from 'lucide-vue-next';
 import { I18nKey, PluginsRegistryKey, OptionsKey } from '../../../../composables/injection-keys';
 import { debounce } from '../../../../helper';
@@ -184,6 +188,47 @@ const getNextFieldColor = (currentKey: string | number): { key: string; def: any
   return null;
 };
 
+const isCustomWidget = (fieldDef: any) =>
+  fieldDef.widget && typeof fieldDef.widget === 'string' &&
+  !['select','inputNumber','color','card','input','Divider','ButtonGroup'].includes(fieldDef.widget) &&
+  pluginWidgets.value[fieldDef.widget];
+
+// Number field grouping: consecutive number fields go on one row
+const isPrevFieldNumber = (currentKey: string | number) => {
+  const keys = Object.keys(pluginSchemaProps.value);
+  const idx = keys.indexOf(String(currentKey));
+  if (idx <= 0) return false;
+  const prevDef = pluginSchemaProps.value[keys[idx - 1]];
+  return prevDef?.type === 'number' && !isHiddenField(prevDef);
+};
+
+const getConsecutiveNumberSiblings = (currentKey: string | number): { key: string; def: any }[] => {
+  const keys = Object.keys(pluginSchemaProps.value);
+  const idx = keys.indexOf(String(currentKey));
+  const siblings: { key: string; def: any }[] = [];
+  for (let i = idx + 1; i < keys.length; i++) {
+    const def = pluginSchemaProps.value[keys[i]];
+    if (def?.type === 'number' && !isHiddenField(def)) {
+      siblings.push({ key: keys[i], def });
+    } else break;
+  }
+  return siblings;
+};
+
+const getConsecutiveNumberSpan = (currentKey: string | number) => {
+  const count = 1 + getConsecutiveNumberSiblings(currentKey).length;
+  return Math.floor(24 / count);
+};
+
+const isHiddenField = (fieldDef: any) => {
+  if (typeof fieldDef.hidden === 'boolean') return fieldDef.hidden;
+  if (typeof fieldDef.hidden === 'string') {
+    const expr = fieldDef.hidden.replace(/\{\{(.+?)\}\}/g, '$1');
+    try { return new Function('formData', `return ${expr}`)(formValues.value); } catch { return false; }
+  }
+  return false;
+};
+
 const isHidden = (fieldDef: any) => {
   if (typeof fieldDef.hidden === 'boolean') return fieldDef.hidden;
   if (typeof fieldDef.hidden === 'string') {
@@ -285,9 +330,9 @@ const isHidden = (fieldDef: any) => {
           </Col>
         </Row>
 
-        <!-- Editable & Required -->
-        <Row :gutter="8">
-          <Col v-if="typeof defaultSchema.readOnly === 'undefined'" :span="8">
+        <!-- Editable & Required & Delete -->
+        <Row :gutter="8" :style="{ alignItems: 'center' }">
+          <Col v-if="typeof defaultSchema.readOnly === 'undefined'" :span="6">
             <Form.Item :label="typedI18n('editable')">
               <Switch
                 :checked="formValues.editable as boolean"
@@ -295,13 +340,16 @@ const isHidden = (fieldDef: any) => {
               />
             </Form.Item>
           </Col>
-          <Col v-if="formValues.editable" :span="16">
+          <Col v-if="formValues.editable" :span="6">
             <Form.Item :label="typedI18n('required')">
               <Switch
                 :checked="formValues.required as boolean"
                 @change="(val: any) => updateField('required', val)"
               />
             </Form.Item>
+          </Col>
+          <Col :span="typeof defaultSchema.readOnly === 'undefined' ? 12 : 24" :style="{ textAlign: 'right' }">
+            <Button danger size="small" @click="$emit('deleteSchema', activeSchema.id)">Delete</Button>
           </Col>
         </Row>
 
@@ -387,139 +435,104 @@ const isHidden = (fieldDef: any) => {
           </Col>
         </Row>
 
-        <!-- Plugin-specific properties -->
+        <!-- Plugin-specific properties: compact layout matching original pdfme -->
         <template v-if="Object.keys(pluginSchemaProps).length > 0">
           <Divider :style="{ margin: '4px 0' }" />
 
+          <!-- Smart layout: group fields into rows based on type -->
           <template v-for="(fieldDef, fieldKey) in pluginSchemaProps" :key="fieldKey">
             <template v-if="!isHidden(fieldDef)">
 
               <!-- Custom plugin widget (e.g. UseDynamicFontSize) -->
-              <template v-if="fieldDef.widget && typeof fieldDef.widget === 'string' && !['select','inputNumber','color','card','input','Divider','ButtonGroup'].includes(fieldDef.widget) && pluginWidgets[fieldDef.widget]">
-                <Form.Item :label="fieldDef.title || undefined">
-                  <WidgetRenderer
-                    v-bind="{ ...widgetProps, schema: fieldDef }"
-                    :widget="pluginWidgets[fieldDef.widget]"
-                  />
+              <template v-if="isCustomWidget(fieldDef)">
+                <WidgetRenderer
+                  v-bind="{ ...widgetProps, schema: fieldDef }"
+                  :widget="pluginWidgets[fieldDef.widget]"
+                />
+              </template>
+
+              <!-- Void: Divider / ButtonGroup -->
+              <template v-else-if="fieldDef.type === 'void' && fieldDef.widget === 'Divider'">
+                <Divider :style="{ margin: '4px 0' }" />
+              </template>
+              <template v-else-if="fieldDef.type === 'void' && fieldDef.widget === 'ButtonGroup'">
+                <Form.Item :label="fieldDef.title || undefined" :style="{ marginBottom: '8px' }">
+                  <ButtonGroupWidget v-bind="{ ...widgetProps, schema: fieldDef }" />
                 </Form.Item>
               </template>
 
-              <!-- Void type: built-in widgets -->
-              <template v-else-if="fieldDef.type === 'void'">
-                <template v-if="fieldDef.widget === 'Divider'">
-                  <Divider :style="{ margin: '4px 0' }" />
-                </template>
-                <template v-else-if="fieldDef.widget === 'ButtonGroup'">
-                  <ButtonGroupWidget v-bind="{ ...widgetProps, schema: fieldDef }" />
-                </template>
+              <!-- Color: pair consecutive color fields -->
+              <template v-else-if="fieldDef.type === 'string' && fieldDef.widget === 'color' && !isPrevFieldColor(fieldKey)">
+                <Row :gutter="8">
+                  <Col :span="getNextFieldColor(fieldKey) ? 12 : 24">
+                    <Form.Item :label="fieldDef.title || String(fieldKey)" :style="{ marginBottom: '8px' }">
+                      <div :style="{ display: 'flex', alignItems: 'center', gap: '4px' }">
+                        <div :style="{ position: 'relative', width: '28px', height: '24px', flexShrink: 0, border: '1px solid #d9d9d9', borderRadius: '2px', overflow: 'hidden', background: (formValues as any)[fieldKey] || '#fff' }">
+                          <input type="color" :value="(formValues as any)[fieldKey] || '#ffffff'" @input="(e: any) => updateField(String(fieldKey), e.target.value)" :style="{ opacity: 0, position: 'absolute', inset: 0, width: '100%', height: '100%', cursor: 'pointer', border: 'none' }" />
+                        </div>
+                        <Input :value="(formValues as any)[fieldKey] || ''" placeholder="" :style="{ flex: 1 }" @change="(e: any) => updateField(String(fieldKey), e.target.value || '')" />
+                      </div>
+                    </Form.Item>
+                  </Col>
+                  <Col v-if="getNextFieldColor(fieldKey)" :span="12">
+                    <Form.Item :label="getNextFieldColor(fieldKey)!.def.title || getNextFieldColor(fieldKey)!.key" :style="{ marginBottom: '8px' }">
+                      <div :style="{ display: 'flex', alignItems: 'center', gap: '4px' }">
+                        <div :style="{ position: 'relative', width: '28px', height: '24px', flexShrink: 0, border: '1px solid #d9d9d9', borderRadius: '2px', overflow: 'hidden', background: (formValues as any)[getNextFieldColor(fieldKey)!.key] || '#fff' }">
+                          <input type="color" :value="(formValues as any)[getNextFieldColor(fieldKey)!.key] || '#ffffff'" @input="(e: any) => updateField(getNextFieldColor(fieldKey)!.key, e.target.value)" :style="{ opacity: 0, position: 'absolute', inset: 0, width: '100%', height: '100%', cursor: 'pointer', border: 'none' }" />
+                        </div>
+                        <Input :value="(formValues as any)[getNextFieldColor(fieldKey)!.key] || ''" placeholder="" :style="{ flex: 1 }" @change="(e: any) => updateField(getNextFieldColor(fieldKey)!.key, e.target.value || '')" />
+                      </div>
+                    </Form.Item>
+                  </Col>
+                </Row>
+              </template>
+              <!-- Skip second color in a pair -->
+              <template v-else-if="fieldDef.type === 'string' && fieldDef.widget === 'color' && isPrevFieldColor(fieldKey)" />
+
+              <!-- Select -->
+              <template v-else-if="fieldDef.type === 'string' && fieldDef.widget === 'select'">
+                <Row :gutter="8"><Col :span="fieldDef.span || 24">
+                  <Form.Item :label="fieldDef.title || String(fieldKey)" :style="{ marginBottom: '8px' }">
+                    <Select :value="(formValues as any)[fieldKey]" :options="(fieldDef.props?.options || []).map((o: any) => typeof o === 'string' ? { label: o, value: o } : { ...o, label: o.label || o.value })" :style="{ width: '100%' }" @change="(val: any) => updateField(String(fieldKey), val)" />
+                  </Form.Item>
+                </Col></Row>
               </template>
 
-              <!-- Color fields: group consecutive colors into one row -->
-              <template v-else-if="fieldDef.type === 'string' && fieldDef.widget === 'color'">
-                <!-- Skip if previous sibling was also color (already rendered as pair) -->
-                <template v-if="!isPrevFieldColor(fieldKey)">
-                  <Row :gutter="8">
-                    <Col :span="getNextFieldColor(fieldKey) ? 12 : 24">
-                      <Form.Item :label="fieldDef.title || String(fieldKey)">
-                        <div :style="{ display: 'flex', alignItems: 'center', gap: '4px' }">
-                          <div :style="{
-                            position: 'relative', width: '28px', height: '24px', flexShrink: 0,
-                            border: '1px solid #d9d9d9', borderRadius: '2px', overflow: 'hidden',
-                            background: (formValues as any)[fieldKey] || '#fff',
-                          }">
-                            <input type="color"
-                              :value="(formValues as any)[fieldKey] || '#ffffff'"
-                              @input="(e: any) => updateField(String(fieldKey), e.target.value)"
-                              :style="{ opacity: 0, position: 'absolute', inset: 0, width: '100%', height: '100%', cursor: 'pointer', border: 'none' }"
-                            />
-                          </div>
-                          <Input
-                            :value="(formValues as any)[fieldKey] || ''"
-                            placeholder=""
-                            :style="{ flex: 1 }"
-                            @change="(e: any) => updateField(String(fieldKey), e.target.value || '')"
-                          />
-                        </div>
-                      </Form.Item>
-                    </Col>
-                    <!-- Pair: next color field on same row -->
-                    <Col v-if="getNextFieldColor(fieldKey)" :span="12">
-                      <Form.Item :label="getNextFieldColor(fieldKey)!.def.title || getNextFieldColor(fieldKey)!.key">
-                        <div :style="{ display: 'flex', alignItems: 'center', gap: '4px' }">
-                          <div :style="{
-                            position: 'relative', width: '28px', height: '24px', flexShrink: 0,
-                            border: '1px solid #d9d9d9', borderRadius: '2px', overflow: 'hidden',
-                            background: (formValues as any)[getNextFieldColor(fieldKey)!.key] || '#fff',
-                          }">
-                            <input type="color"
-                              :value="(formValues as any)[getNextFieldColor(fieldKey)!.key] || '#ffffff'"
-                              @input="(e: any) => updateField(getNextFieldColor(fieldKey)!.key, e.target.value)"
-                              :style="{ opacity: 0, position: 'absolute', inset: 0, width: '100%', height: '100%', cursor: 'pointer', border: 'none' }"
-                            />
-                          </div>
-                          <Input
-                            :value="(formValues as any)[getNextFieldColor(fieldKey)!.key] || ''"
-                            placeholder=""
-                            :style="{ flex: 1 }"
-                            @change="(e: any) => updateField(getNextFieldColor(fieldKey)!.key, e.target.value || '')"
-                          />
-                        </div>
-                      </Form.Item>
-                    </Col>
-                  </Row>
-                </template>
-              </template>
-
-              <!-- String field (non-color) -->
+              <!-- String (plain) -->
               <template v-else-if="fieldDef.type === 'string'">
-                <Row :gutter="8">
-                  <Col :span="fieldDef.span || 24">
-                    <Form.Item :label="fieldDef.title || String(fieldKey)">
-                      <Select
-                        v-if="fieldDef.widget === 'select'"
-                        :value="(formValues as any)[fieldKey]"
-                        :options="(fieldDef.props?.options || []).map((o: any) => typeof o === 'string' ? { label: o, value: o } : { ...o, label: o.label || o.value })"
-                        :style="{ width: '100%' }"
-                        @change="(val: any) => updateField(String(fieldKey), val)"
-                      />
-                      <Input
-                        v-else
-                        :value="(formValues as any)[fieldKey]"
-                        @change="(e: any) => updateField(String(fieldKey), e.target.value)"
-                      />
-                    </Form.Item>
-                  </Col>
-                </Row>
+                <Row :gutter="8"><Col :span="fieldDef.span || 24">
+                  <Form.Item :label="fieldDef.title || String(fieldKey)" :style="{ marginBottom: '8px' }">
+                    <Input :value="(formValues as any)[fieldKey]" @change="(e: any) => updateField(String(fieldKey), e.target.value)" />
+                  </Form.Item>
+                </Col></Row>
               </template>
 
-              <!-- Number field -->
-              <template v-else-if="fieldDef.type === 'number'">
+              <!-- Number: check if next field is also number to group them -->
+              <template v-else-if="fieldDef.type === 'number' && !isPrevFieldNumber(fieldKey)">
                 <Row :gutter="8">
-                  <Col :span="fieldDef.span || 24">
-                    <Form.Item :label="fieldDef.title || String(fieldKey)">
-                      <InputNumber
-                        :value="(formValues as any)[fieldKey]"
-                        :min="fieldDef.min ?? fieldDef.props?.min"
-                        :max="fieldDef.max ?? fieldDef.props?.max"
-                        :step="fieldDef.props?.step ?? 1"
-                        :disabled="fieldDef.disabled"
-                        :style="{ width: '100%' }"
-                        @change="(val: any) => updateField(String(fieldKey), val)"
-                      />
+                  <Col :span="getConsecutiveNumberSpan(fieldKey)">
+                    <Form.Item :label="fieldDef.title || String(fieldKey)" :style="{ marginBottom: '8px' }">
+                      <InputNumber :value="(formValues as any)[fieldKey]" :min="fieldDef.min ?? fieldDef.props?.min" :max="fieldDef.max ?? fieldDef.props?.max" :step="fieldDef.props?.step ?? 1" :disabled="fieldDef.disabled" :style="{ width: '100%' }" @change="(val: any) => updateField(String(fieldKey), val)" />
                     </Form.Item>
                   </Col>
+                  <!-- Render consecutive number siblings on same row -->
+                  <template v-for="sib in getConsecutiveNumberSiblings(fieldKey)" :key="sib.key">
+                    <Col :span="getConsecutiveNumberSpan(fieldKey)">
+                      <Form.Item :label="sib.def.title || sib.key" :style="{ marginBottom: '8px' }">
+                        <InputNumber :value="(formValues as any)[sib.key]" :min="sib.def.min ?? sib.def.props?.min" :max="sib.def.max ?? sib.def.props?.max" :step="sib.def.props?.step ?? 1" :disabled="sib.def.disabled" :style="{ width: '100%' }" @change="(val: any) => updateField(sib.key, val)" />
+                      </Form.Item>
+                    </Col>
+                  </template>
                 </Row>
               </template>
+              <!-- Skip numbers already rendered as sibling -->
+              <template v-else-if="fieldDef.type === 'number' && isPrevFieldNumber(fieldKey)" />
 
-              <!-- Boolean field (plain, no custom widget) -->
+              <!-- Boolean -->
               <template v-else-if="fieldDef.type === 'boolean'">
-                <Row :gutter="8">
-                  <Col :span="fieldDef.span || 24">
-                    <Form.Item :label="fieldDef.title || String(fieldKey)">
-                      <Switch
-                        :checked="(formValues as any)[fieldKey]"
-                        @change="(val: any) => updateField(String(fieldKey), val)"
-                      />
+                <Row :gutter="8"><Col :span="fieldDef.span || 24">
+                  <Form.Item :label="fieldDef.title || String(fieldKey)" :style="{ marginBottom: '8px' }">
+                    <Switch :checked="(formValues as any)[fieldKey]" @change="(val: any) => updateField(String(fieldKey), val)" />
                     </Form.Item>
                   </Col>
                 </Row>

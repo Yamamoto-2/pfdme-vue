@@ -8,6 +8,7 @@ import ListView from './ListView/ListView.vue';
 import DetailView from './DetailView/DetailView.vue';
 
 const props = defineProps<SidebarProps>();
+defineEmits<{ (e: 'deleteSchema', id: string): void }>();
 
 const getActiveSchemas = () =>
   props.schemas.filter((s) => props.activeElements.map((ae) => ae.id).includes(s.id));
@@ -86,6 +87,7 @@ const lastActiveSchema = computed(() => getLastActiveSchema());
         :activeElements="activeElements"
         :deselectSchema="deselectSchema"
         :activeSchema="lastActiveSchema"
+        @deleteSchema="(id: string) => $emit('deleteSchema', id)"
       />
     </div>
   </div>
