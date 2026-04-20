@@ -13,6 +13,17 @@
   ],
   "license": "MIT",
   "author": "Yamamoto",
+  "homepage": "https://github.com/Yamamoto-2/pdfme-vue#readme",
+  "bugs": {
+    "url": "https://github.com/Yamamoto-2/pdfme-vue/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Yamamoto-2/pdfme-vue.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "sideEffects": false,
   "files": [
